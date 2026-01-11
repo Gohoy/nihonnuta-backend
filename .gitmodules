@@ -1,0 +1,3 @@
+[submodule "neatease-api"]
+	path = neatease-api
+	url = git@github.com:Gohoy/api-enhanced.git
