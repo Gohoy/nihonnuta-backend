@@ -1,5 +1,5 @@
-create database if not exists songs;
-use songs;
+CREATE DATABASE songs;
+
 
 CREATE OR REPLACE FUNCTION set_update_time()
 RETURNS TRIGGER AS $$
