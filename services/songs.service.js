@@ -1,5 +1,4 @@
 const pool = require("../db/pool");
-const multer = require("multer");
 const cosService = require("./cos.service");
 
 /* Create */
@@ -75,35 +74,19 @@ async function searchSongs(keywords, offset, limit) {
   };
 }
 
-// 上传歌曲,bucket是songs path 配置为songs/{songId}/{filename}
-
-// 配置 multer（内存存储）
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 限制 50MB
-  fileFilter: (req, file, cb) => {
-    // 只允许音频文件
-    const allowedTypes = ["audio/mpeg", "audio/wav", "audio/flac", "audio/mp3"];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error("只支持 MP3、WAV、FLAC 格式"));
-    }
-  },
-});
-
 // 上传歌曲接口
 async function uploadSong(req, res) {
   try {
     const file = req.file;
     const songId = req.body.songId || Date.now().toString();
+    const filename = req.body.filename || (file ? file.originalname : null);
 
     if (!file) {
       return res.status(400).json({ error: "请选择文件" });
     }
 
     // 构建存储路径: songs/{songId}/{filename}
-    const objectName = `${songId}`;
+    const objectName = `${songId}/${filename}`;
     const bucketName = "songs";
 
     // 上传到 MinIO
