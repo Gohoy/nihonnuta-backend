@@ -14,7 +14,9 @@
     "jade": "~1.11.0",
     "kuroshiro": "^1.2.0",
     "kuroshiro-analyzer-kuromoji": "^1.1.0",
+    "minio": "^8.0.6",
     "morgan": "~1.9.1",
+    "multer": "^2.0.2",
     "pg": "^8.16.3"
   }
 }

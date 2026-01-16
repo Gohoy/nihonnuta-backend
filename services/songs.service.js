@@ -1,4 +1,6 @@
-const pool = require('../db/pool');
+const pool = require("../db/pool");
+const multer = require("multer");
+const cosService = require("./cos.service");
 
 /* Create */
 async function createSong(song) {
@@ -18,10 +20,9 @@ async function createSong(song) {
 
 /* Read */
 async function getSongById(songId) {
-  const { rows } = await pool.query(
-    'SELECT * FROM songs WHERE song_id = $1',
-    [songId]
-  );
+  const { rows } = await pool.query("SELECT * FROM songs WHERE song_id = $1", [
+    songId,
+  ]);
   return rows[0];
 }
 // 分页获取
@@ -31,27 +32,27 @@ async function getSongs(offset, limit) {
   }
 
   const { rows } = await pool.query(
-    'SELECT * FROM songs ORDER BY create_time DESC OFFSET $1 LIMIT $2',
+    "SELECT * FROM songs ORDER BY create_time DESC OFFSET $1 LIMIT $2",
     [offset, limit]
   );
-  const count = await pool.query('SELECT COUNT(*) FROM songs');
+  const count = await pool.query("SELECT COUNT(*) FROM songs");
   return rows, parseInt(count.rows[0].count, 10);
 }
 
 /* Update */
 async function updatePlayCount(songId) {
   await pool.query(
-    'UPDATE songs SET play_count = play_count + 1 WHERE song_id = $1',
+    "UPDATE songs SET play_count = play_count + 1 WHERE song_id = $1",
     [songId]
   );
 }
 
 /* Delete（软删建议） */
 async function hideSong(songId) {
-  await pool.query(
-    'UPDATE songs SET status = $1 WHERE song_id = $2',
-    ['offline', songId]
-  );
+  await pool.query("UPDATE songs SET status = $1 WHERE song_id = $2", [
+    "offline",
+    songId,
+  ]);
 }
 // search
 async function searchSongs(keywords, offset, limit) {
@@ -74,7 +75,58 @@ async function searchSongs(keywords, offset, limit) {
   };
 }
 
+// 上传歌曲,bucket是songs path 配置为songs/{songId}/{filename}
 
+// 配置 multer（内存存储）
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 限制 50MB
+  fileFilter: (req, file, cb) => {
+    // 只允许音频文件
+    const allowedTypes = ["audio/mpeg", "audio/wav", "audio/flac", "audio/mp3"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("只支持 MP3、WAV、FLAC 格式"));
+    }
+  },
+});
+
+// 上传歌曲接口
+async function uploadSong(req, res) {
+  try {
+    const file = req.file;
+    const songId = req.body.songId || Date.now().toString();
+
+    if (!file) {
+      return res.status(400).json({ error: "请选择文件" });
+    }
+
+    // 构建存储路径: songs/{songId}/{filename}
+    const objectName = `${songId}`;
+    const bucketName = "songs";
+
+    // 上传到 MinIO
+    await cosService.uploadObject(bucketName, objectName, file);
+
+    // 获取访问 URL
+    const url = await cosService.getObjectUrl(bucketName, objectName);
+
+    res.json({
+      success: true,
+      data: {
+        songId,
+        filename: file.originalname,
+        path: objectName,
+        url,
+        size: file.size,
+      },
+    });
+  } catch (error) {
+    console.error("上传失败:", error);
+    res.status(500).json({ error: error.message });
+  }
+}
 
 module.exports = {
   createSong,
@@ -83,4 +135,5 @@ module.exports = {
   hideSong,
   getSongs,
   searchSongs,
+  uploadSong,
 };
