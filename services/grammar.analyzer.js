@@ -1,7 +1,6 @@
 // grammar-analyzer.js
 
-import GRAMMAR_RULES from "../data/grammar-rules.js";
-
+const GRAMMAR_RULES = require("../data/grammar-rules.js");
 
 class GrammarAnalyzer {
   constructor() {
@@ -146,4 +145,4 @@ class GrammarAnalyzer {
   }
 }
 
-export default GrammarAnalyzer;
+module.exports = GrammarAnalyzer;

@@ -1,5 +1,15 @@
 const songService = require("../services/songs.service");
 const neteaseService = require("../services/netease.service");
+const LyricsProcessor = require("../services/lyrics.service");
+
+let lyricsProcessor;
+async function getLyricsProcessor() {
+  if (!lyricsProcessor) {
+    lyricsProcessor = new LyricsProcessor();
+    await lyricsProcessor.init();
+  }
+  return lyricsProcessor;
+}
 async function getSong(req, res) {
   const song = await songService.getSongById(req.params.id);
   if (!song) {
@@ -22,6 +32,12 @@ async function getSongs(req, res) {
   const limit = parseInt(req.query.limit, 10) || 10;
   const { songs, total } = await songService.getSongs(offset, limit);
   return res.success({ songs, total });
+}
+
+async function getPopularSongs(req, res) {
+  const limit = parseInt(req.query.limit, 10) || 10;
+  const songs = await songService.getPopularSongs(limit);
+  return res.success({ songs });
 }
 
 async function searchSongs(req, res) {
@@ -76,14 +92,62 @@ async function getNeteaseSongDetail(req, res) {
   }
 }
 
+async function getProcessedSongLyrics(req, res) {
+  try {
+    const songId = req.query.id;
+    const userId = req.query.user_id;
+    if (!songId) {
+      return res.status(400).json({ message: "id is required" });
+    }
+    const song = await songService.getSongById(songId);
+    if (!song) {
+      return res.status(404).json({ message: "song not found" });
+    }
+    if (song.is_public === false && song.create_user && userId !== song.create_user) {
+      return res.status(403).json({ message: "permission denied" });
+    }
+    const processor = await getLyricsProcessor();
+    const lyricsText = song.lyrics_text || "";
+    if (lyricsText && lyricsText.trim()) {
+      const processed = await processor.processLyricsText(lyricsText);
+      return res.success(processed);
+    }
+    const lyricData = await neteaseService.getLyric(songId);
+    const processed = await processor.processSongLyricsData(lyricData);
+    return res.success(processed);
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+    return res.status(statusCode).json({ message: error.message });
+  }
+}
+
+async function getProcessedNeteaseLyric(req, res) {
+  try {
+    const songId = req.query.id;
+    if (!songId) {
+      return res.status(400).json({ message: "id is required" });
+    }
+    const lyricData = await neteaseService.getLyric(songId);
+    const processor = await getLyricsProcessor();
+    const processed = await processor.processSongLyricsData(lyricData);
+    return res.success(processed);
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+    return res.status(statusCode).json({ message: error.message });
+  }
+}
+
 module.exports = {
   getSong,
   playSong,
   createSong,
   getSongs,
+  getPopularSongs,
   searchSongs,
   uploadSong,
   searchNeteaseSongs,
   getNeteaseLyric,
   getNeteaseSongDetail,
+  getProcessedSongLyrics,
+  getProcessedNeteaseLyric,
 };

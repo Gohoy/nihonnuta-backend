@@ -4,8 +4,19 @@ const cosService = require("./cos.service");
 /* Create */
 async function createSong(song) {
   const sql = `
-    INSERT INTO songs (song_id, song_name, singer, difficulty, audio_url, lyrics)
-    VALUES ($1, $2, $3, $4, $5, $6)
+    INSERT INTO songs (
+      song_id,
+      song_name,
+      singer,
+      difficulty,
+      audio_url,
+      cover_url,
+      lyrics_text,
+      is_public,
+      status,
+      create_user
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
   `;
   await pool.query(sql, [
     song.song_id,
@@ -13,7 +24,11 @@ async function createSong(song) {
     song.singer,
     song.difficulty,
     song.audio_url,
-    song.lyrics,
+    song.cover_url || "",
+    song.lyrics_text || "",
+    song.is_public !== undefined ? song.is_public : true,
+    song.status || "published",
+    song.create_user || null,
   ]);
 }
 
@@ -31,10 +46,12 @@ async function getSongs(offset, limit) {
   }
 
   const { rows } = await pool.query(
-    "SELECT * FROM songs ORDER BY create_time DESC OFFSET $1 LIMIT $2",
+    "SELECT * FROM songs WHERE status = 'published' AND is_public = TRUE ORDER BY create_time DESC OFFSET $1 LIMIT $2",
     [offset, limit]
   );
-  const count = await pool.query("SELECT COUNT(*) FROM songs");
+  const count = await pool.query(
+    "SELECT COUNT(*) FROM songs WHERE status = 'published' AND is_public = TRUE"
+  );
   return {
     songs: rows,
     total: parseInt(count.rows[0].count, 10),
@@ -61,20 +78,33 @@ async function searchSongs(keywords, offset, limit) {
   const searchPattern = `%${keywords}%`;
   const { rows } = await pool.query(
     `SELECT * FROM songs 
-         WHERE song_name ILIKE $1 OR singer ILIKE $1
+         WHERE (song_name ILIKE $1 OR singer ILIKE $1)
+         AND status = 'published'
+         AND is_public = TRUE
          ORDER BY create_time DESC 
          OFFSET $2 LIMIT $3`,
     [searchPattern, offset, limit]
   );
   const countResult = await pool.query(
     `SELECT COUNT(*) FROM songs 
-         WHERE song_name ILIKE $1 OR singer ILIKE $1`,
+         WHERE (song_name ILIKE $1 OR singer ILIKE $1)
+         AND status = 'published'
+         AND is_public = TRUE`,
     [searchPattern]
   );
   return {
     songs: rows,
     total: parseInt(countResult.rows[0].count, 10),
   };
+}
+
+// 热门歌曲
+async function getPopularSongs(limit = 10) {
+  const { rows } = await pool.query(
+    "SELECT * FROM songs WHERE status = 'published' AND is_public = TRUE ORDER BY COALESCE(play_count, 0) DESC, create_time DESC LIMIT $1",
+    [limit]
+  );
+  return rows;
 }
 
 // 上传歌曲接口
@@ -121,5 +151,6 @@ module.exports = {
   hideSong,
   getSongs,
   searchSongs,
+  getPopularSongs,
   uploadSong,
 };
