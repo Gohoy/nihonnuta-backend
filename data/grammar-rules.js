@@ -356,4 +356,4 @@ const GRAMMAR_RULES = [
   },
 ];
 
-export default GRAMMAR_RULES;
+module.exports = GRAMMAR_RULES;

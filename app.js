@@ -8,6 +8,7 @@ const responseMiddleware = require('./middlewares/response');;
 
 var indexRouter = require('./routes/index');
 var songsRouter = require('./routes/songs');
+var learningRouter = require('./routes/learning');
 
 var app = express();
 
@@ -21,6 +22,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
 app.use('/songs', songsRouter);
+app.use('/learning', learningRouter);
 
 // error handler
 app.use(function(err, req, res, next) {

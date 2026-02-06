@@ -1,10 +1,7 @@
-import { createRequire } from "module";
-import GrammarAnalyzer from "./grammar.analyzer.js";
-const require = createRequire(import.meta.url);
-
+const GrammarAnalyzer = require("./grammar.analyzer.js");
 const KuroshiroModule = require("kuroshiro");
 const KuromojiAnalyzer = require("kuroshiro-analyzer-kuromoji");
-const Kuroshiro = KuroshiroModule.default;
+const Kuroshiro = KuroshiroModule.default || KuroshiroModule;
 
 class LyricsProcessor {
   constructor() {
@@ -125,18 +122,15 @@ class LyricsProcessor {
     };
   }
 
-  async processSongLyrics(songId) {
+  async processSongLyricsData(lyricData = {}) {
     // 首先是拿到它的歌词
     // 然后是处理歌词的分词
     // 然后是歌词分词的单词分级
     // 然后语语法分析
 
-    const res = await fetch(`http://localhost:3000/lyric?id=${songId}`);
-
-    let data = await res.json();
-    const originLyrics = data.lrc.lyric.split("\n");
-    const translateLyrics = data.tlyric.lyric.split("\n");
-    const romalrc = data.romalrc.lyric.split("\n");
+    const originLyrics = (lyricData?.lrc?.lyric || "").split("\n");
+    const translateLyrics = (lyricData?.tlyric?.lyric || "").split("\n");
+    const romalrc = (lyricData?.romalrc?.lyric || "").split("\n");
     // 先处理原歌词的数据：分词
     let lyricsJsonRes = {};
     let timelineTextMap = {};
@@ -144,7 +138,7 @@ class LyricsProcessor {
     // 先处理翻译歌词
     for (let index in translateLyrics) {
       const lineObj = parseLrcLine(translateLyrics[index]);
-      if (lineObj.time !== undefined) {
+      if (lineObj.timeStr) {
         if (!timelineTextMap[lineObj.time]) {
           timelineTextMap[lineObj.time] = {};
         }
@@ -155,7 +149,7 @@ class LyricsProcessor {
     // 处理罗马音歌词
     for (let index in romalrc) {
       const lineObj = parseLrcLine(romalrc[index]);
-      if (lineObj.time !== undefined) {
+      if (lineObj.timeStr) {
         if (!timelineTextMap[lineObj.time]) {
           timelineTextMap[lineObj.time] = {};
         }
@@ -167,7 +161,7 @@ class LyricsProcessor {
     for (let index in originLyrics) {
       // 需要先去除前面的时间
       const lineObj = parseLrcLine(originLyrics[index]);
-      if (lineObj.time !== undefined) {
+      if (lineObj.timeStr) {
         if (!timelineTextMap[lineObj.time]) {
           timelineTextMap[lineObj.time] = {};
         }
@@ -177,6 +171,8 @@ class LyricsProcessor {
           token.tags = this.allWords[token.text]?.tags;
         }
         timelineTextMap[lineObj.time] = {
+          time: lineObj.time,
+          time_str: lineObj.timeStr,
           ...timelineTextMap[lineObj.time],
           ...lineProcessRes,
         };
@@ -188,7 +184,73 @@ class LyricsProcessor {
       lyricStartIndex:
         Object.keys(timelineTextMap).length - translateLyrics.length,
     };
-    lyricsJsonRes["lines"] = Object.values(timelineTextMap);
+    const sortedTimes = Object.keys(timelineTextMap)
+      .map((time) => Number(time))
+      .filter((time) => !Number.isNaN(time))
+      .sort((a, b) => a - b);
+    lyricsJsonRes["lines"] = sortedTimes.map((time) => timelineTextMap[time]);
+    const grammarAnalyzer = new GrammarAnalyzer();
+    return grammarAnalyzer.analyzeLyricsGrammar(lyricsJsonRes);
+  }
+
+  async processLyricsText(rawLyrics = "") {
+    const lines = rawLyrics.split("\n");
+    const hasTime = lines.some((line) => /\[\d{2}:\d{2}\.\d{2,3}\]/.test(line));
+
+    if (hasTime) {
+      const timelineTextMap = {};
+      for (const line of lines) {
+        const lineObj = parseLrcLine(line);
+        if (!lineObj.timeStr) {
+          continue;
+        }
+        const lineProcessRes = await this.processLine(lineObj.text);
+        for (let token of lineProcessRes.tokens) {
+          token.tags = this.allWords[token.text]?.tags;
+        }
+        timelineTextMap[lineObj.time] = {
+          time: lineObj.time,
+          time_str: lineObj.timeStr,
+          ...lineProcessRes,
+        };
+      }
+
+      const sortedTimes = Object.keys(timelineTextMap)
+        .map((time) => Number(time))
+        .filter((time) => !Number.isNaN(time))
+        .sort((a, b) => a - b);
+
+      const lyricsJsonRes = {
+        meta: {
+          lineCount: sortedTimes.length,
+          lyricStartIndex: 0,
+        },
+        lines: sortedTimes.map((time) => timelineTextMap[time]),
+      };
+      const grammarAnalyzer = new GrammarAnalyzer();
+      return grammarAnalyzer.analyzeLyricsGrammar(lyricsJsonRes);
+    }
+
+    const processedLines = [];
+    for (const line of lines) {
+      const text = line.trim();
+      if (!text) continue;
+      const lineProcessRes = await this.processLine(text);
+      for (let token of lineProcessRes.tokens) {
+        token.tags = this.allWords[token.text]?.tags;
+      }
+      processedLines.push({
+        ...lineProcessRes,
+      });
+    }
+
+    const lyricsJsonRes = {
+      meta: {
+        lineCount: processedLines.length,
+        lyricStartIndex: 0,
+      },
+      lines: processedLines,
+    };
     const grammarAnalyzer = new GrammarAnalyzer();
     return grammarAnalyzer.analyzeLyricsGrammar(lyricsJsonRes);
   }
@@ -214,15 +276,4 @@ function parseLrcLine(line) {
   return { time: 0, timeStr: "", text: line };
 }
 
-// 测试
-async function main() {
-  const processor = new LyricsProcessor();
-  await processor.init();
-  //
-  // const result = await processor.processLine("今日は夏の午後")
-  const result = await processor.processSongLyrics(536622304);
-  console.log(JSON.stringify(result, null, 2));
-}
-main().catch(console.error);
-
-export default LyricsProcessor;
+module.exports = LyricsProcessor;
