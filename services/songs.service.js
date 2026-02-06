@@ -35,7 +35,10 @@ async function getSongs(offset, limit) {
     [offset, limit]
   );
   const count = await pool.query("SELECT COUNT(*) FROM songs");
-  return rows, parseInt(count.rows[0].count, 10);
+  return {
+    songs: rows,
+    total: parseInt(count.rows[0].count, 10),
+  };
 }
 
 /* Update */
