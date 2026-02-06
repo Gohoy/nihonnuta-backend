@@ -7,6 +7,9 @@ const upload = multer({ storage: multer.memoryStorage() });
 router.post("/upload", upload.single("file"), controller.uploadSong);
 router.get("/search", controller.searchSongs);
 router.get("/page", controller.getSongs);
+router.get("/netease/search", controller.searchNeteaseSongs);
+router.get("/netease/lyric", controller.getNeteaseLyric);
+router.get("/netease/song", controller.getNeteaseSongDetail);
 
 router.get("/:id", controller.getSong);
 router.post("/:id/play", controller.playSong);

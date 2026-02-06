@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  backend:
+    image: ghcr.io/gohoy/nihonnuta-backend:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      PORT: 5217
+      NETEASE_API_BASE: http://netease-api:3000
+    ports:
+      - "5217:5217"
+    depends_on:
+      - postgres
+      - minio
+      - netease-api
+
+  netease-api:
+    image: ghcr.io/gohoy/nihonnuta-netease:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+
+  frontend:
+    image: ghcr.io/gohoy/nihonnuta-uniapp:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${PG_DATABASE}
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER} -d ${PG_DATABASE}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    env_file:
+      - .env
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+      MINIO_DEFAULT_BUCKETS: "songs"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+      - ./minio/config:/root/.minio
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+  minio_data:
+    driver: local
