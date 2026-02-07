@@ -28,6 +28,12 @@ app.use('/learning', learningRouter);
 app.use('/wordbook', wordbookRouter);
 app.use('/grammarbook', grammarbookRouter);
 
+// 数据库迁移路由（仅用于开发/修复）
+if (process.env.NODE_ENV !== 'production') {
+  const migrationRouter = require('./routes/migration');
+  app.use('/migration', migrationRouter);
+}
+
 // error handler
 app.use(function(err, req, res, next) {
   // set locals, only providing error in development
