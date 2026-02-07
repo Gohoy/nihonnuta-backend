@@ -9,6 +9,8 @@ const responseMiddleware = require('./middlewares/response');;
 var indexRouter = require('./routes/index');
 var songsRouter = require('./routes/songs');
 var learningRouter = require('./routes/learning');
+var wordbookRouter = require('./routes/wordbook');
+var grammarbookRouter = require('./routes/grammarbook');
 
 var app = express();
 
@@ -23,6 +25,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', indexRouter);
 app.use('/songs', songsRouter);
 app.use('/learning', learningRouter);
+app.use('/wordbook', wordbookRouter);
+app.use('/grammarbook', grammarbookRouter);
 
 // error handler
 app.use(function(err, req, res, next) {
