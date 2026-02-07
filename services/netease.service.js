@@ -47,8 +47,17 @@ async function getSongDetail(songId) {
   return requestJson("/song/detail", { ids: songId });
 }
 
+async function getSongUrl(songId) {
+  return requestJson("/song/url", { id: songId });
+}
+
+// 导出 requestJson 供其他服务使用
+module.exports.requestJson = requestJson;
+
 module.exports = {
   searchSongs,
   getLyric,
   getSongDetail,
+  getSongUrl,
+  requestJson,
 };

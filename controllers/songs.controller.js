@@ -24,8 +24,35 @@ async function playSong(req, res) {
 }
 
 async function createSong(req, res) {
-  await songService.createSong(req.body);
-  return res.status(201).json({ success: true });
+  try {
+    await songService.createSong(req.body);
+    return res.status(201).json({ success: true });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+}
+
+async function importFromNetease(req, res) {
+  try {
+    const neteaseSongId = req.body.netease_song_id || req.query.id;
+    if (!neteaseSongId) {
+      return res.status(400).json({ message: "netease_song_id is required" });
+    }
+    
+    const options = {
+      difficulty: req.body.difficulty,
+      is_public: req.body.is_public,
+      create_user: req.body.create_user,
+      song_name_cn: req.body.song_name_cn,
+      force: req.body.force || false,
+    };
+    
+    const result = await songService.importSongFromNetease(neteaseSongId, options);
+    return res.success(result);
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+    return res.status(statusCode).json({ message: error.message });
+  }
 }
 async function getSongs(req, res) {
   const offset = parseInt(req.query.offset, 10) || 0;
@@ -150,4 +177,5 @@ module.exports = {
   getNeteaseSongDetail,
   getProcessedSongLyrics,
   getProcessedNeteaseLyric,
+  importFromNetease,
 };

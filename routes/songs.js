@@ -14,6 +14,7 @@ router.get("/netease/processed", controller.getProcessedNeteaseLyric);
 router.get("/netease/song", controller.getNeteaseSongDetail);
 router.get("/processed", controller.getProcessedSongLyrics);
 
+router.post("/import/netease", controller.importFromNetease);
 router.get("/:id", controller.getSong);
 router.post("/:id/play", controller.playSong);
 router.post("/", controller.createSong);
