@@ -24,6 +24,10 @@ dist
 .stylelintcache
 .eslintcache
 
+# Environment files
+.env
+deploy/.env
+
 docs/.vitepress/dist
 docs/.vitepress/cache
 

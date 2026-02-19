@@ -377,6 +377,37 @@ async function importSongFromNetease(neteaseSongId, options = {}) {
   }
 }
 
+/**
+ * 更新歌曲音频 URL（上传后持久化存储路径）
+ */
+async function updateSongAudioUrl(songId, audioUrl) {
+  const sql = `UPDATE songs SET audio_url = $1 WHERE song_id = $2 RETURNING *`;
+  const { rows } = await pool.query(sql, [audioUrl, songId]);
+  return rows[0];
+}
+
+/**
+ * 获取歌曲音频的新鲜预签名 URL
+ */
+async function getFreshAudioUrl(songId) {
+  const song = await getSongById(songId);
+  if (!song) return null;
+
+  // audio_url stores the MinIO object path like "songId/filename.mp3"
+  // or a full external URL (e.g. netease)
+  const audioUrl = song.audio_url || '';
+  if (!audioUrl) return null;
+
+  // If it's an external URL (not a MinIO path), return as-is
+  if (audioUrl.startsWith('http://') || audioUrl.startsWith('https://')) {
+    return audioUrl;
+  }
+
+  // Generate fresh presigned URL from MinIO
+  const url = await cosService.getObjectUrl('songs', audioUrl);
+  return url;
+}
+
 module.exports = {
   createSong,
   getSongById,
@@ -387,4 +418,6 @@ module.exports = {
   getPopularSongs,
   uploadSong,
   importSongFromNetease,
+  updateSongAudioUrl,
+  getFreshAudioUrl,
 };

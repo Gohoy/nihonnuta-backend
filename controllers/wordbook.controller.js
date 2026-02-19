@@ -1,4 +1,5 @@
 const wordbookService = require("../services/wordbook.service");
+const { sm2 } = require("../services/srs.service");
 
 async function addWord(req, res) {
   try {
@@ -112,6 +113,51 @@ async function getWordbookStats(req, res) {
   }
 }
 
+async function getReviewWords(req, res) {
+  try {
+    const userId = req.query.user_id;
+    if (!userId) {
+      return res.status(400).json({ message: "user_id is required" });
+    }
+    const limit = parseInt(req.query.limit, 10) || 20;
+    const result = await wordbookService.getDueWords(userId, limit);
+    return res.success(result);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+}
+
+async function submitReview(req, res) {
+  try {
+    const { word_book_id, quality } = req.body;
+    const userId = req.body.user_id || req.query.user_id;
+
+    if (!userId || !word_book_id || quality === undefined) {
+      return res.status(400).json({ message: "user_id, word_book_id, and quality are required" });
+    }
+    if (quality < 0 || quality > 3) {
+      return res.status(400).json({ message: "quality must be 0-3" });
+    }
+
+    // Fetch current SRS state
+    const pool = require("../db/pool");
+    const { rows } = await pool.query(
+      "SELECT ease_factor, interval_days, review_count FROM user_wordbooks WHERE word_book_id = $1 AND user_id = $2",
+      [word_book_id, userId]
+    );
+    if (!rows[0]) {
+      return res.status(404).json({ message: "Word not found" });
+    }
+
+    const { ease_factor, interval_days, review_count } = rows[0];
+    const srsResult = sm2(quality, parseFloat(ease_factor) || 2.5, interval_days || 0, review_count || 0);
+    const result = await wordbookService.reviewWord(userId, word_book_id, srsResult);
+    return res.success(result);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+}
+
 module.exports = {
   addWord,
   getWordbook,
@@ -119,5 +165,7 @@ module.exports = {
   removeWord,
   updateWordNote,
   getWordbookStats,
+  getReviewWords,
+  submitReview,
 };
 
