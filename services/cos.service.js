@@ -29,25 +29,20 @@ async function uploadObject(bucketName, objectName, file) {
   return objectName;
 }
 
-// 获取文件访问 URL（临时链接，有效期1天）
-async function getObjectUrl(bucketName, objectName) {
-  const presignedUrl = await minioClient.presignedGetObject(
-    bucketName,
-    objectName,
-    24 * 60 * 60
-  );
-  // Replace internal Docker hostname with public host for browser access
+// 获取文件公开访问 URL（通过 nginx /storage/ 代理）
+// bucket 需设置为 public download（mc anonymous set download）
+function getObjectUrl(bucketName, objectName) {
   const publicHost = process.env.MINIO_PUBLIC_HOST;
-  const publicPort = process.env.MINIO_PUBLIC_PORT || "9000";
-  const publicSSL = String(process.env.MINIO_PUBLIC_USE_SSL || "false") === "true";
   if (publicHost) {
-    const internalUrl = new URL(presignedUrl);
-    internalUrl.hostname = publicHost;
-    internalUrl.port = publicPort;
-    internalUrl.protocol = publicSSL ? "https:" : "http:";
-    return internalUrl.toString();
+    const publicSSL = String(process.env.MINIO_PUBLIC_USE_SSL || "false") === "true";
+    const protocol = publicSSL ? "https" : "http";
+    // 通过 nginx /storage/ 代理访问 MinIO，不暴露 9000 端口
+    return `${protocol}://${publicHost}/storage/${bucketName}/${objectName}`;
   }
-  return presignedUrl;
+  // 本地开发直接访问 MinIO
+  const endpoint = process.env.MINIO_ENDPOINT || "localhost";
+  const port = process.env.MINIO_PORT || "9000";
+  return `http://${endpoint}:${port}/${bucketName}/${objectName}`;
 }
 
 // 获取永久访问 URL（需要设置 bucket 为公开）
