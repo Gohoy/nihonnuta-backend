@@ -12,7 +12,10 @@ $$ LANGUAGE plpgsql;
 
 CREATE TABLE users (
     user_id VARCHAR(64) PRIMARY KEY,
-    username VARCHAR(50) NOT NULL,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) DEFAULT '',
+    wx_openid VARCHAR(128) UNIQUE,
+    nickname VARCHAR(50) DEFAULT '',
     avatar_url VARCHAR(255) DEFAULT '',
     phone VARCHAR(20) UNIQUE,
     email VARCHAR(100) UNIQUE,
@@ -50,6 +53,7 @@ CREATE TABLE songs (
     status VARCHAR(20) DEFAULT 'published',
     is_public BOOLEAN DEFAULT TRUE,
     create_user VARCHAR(64),
+    kana_overrides JSONB DEFAULT '{}'::jsonb,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -128,6 +132,7 @@ CREATE TABLE user_wordbooks (
     review_count INT DEFAULT 0,
     last_review_time TIMESTAMP,
     note TEXT DEFAULT '',
+    example_sentence TEXT DEFAULT '',
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uk_user_word UNIQUE (user_id, song_id, line_num, token_id)
 );
@@ -151,9 +156,32 @@ CREATE TABLE user_grammar_books (
     review_count INT DEFAULT 0,
     last_review_time TIMESTAMP,
     note TEXT DEFAULT '',
+    example_sentence TEXT DEFAULT '',
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uk_user_grammar UNIQUE (user_id, song_id, line_num, grammar_id)
 );
 
 CREATE INDEX idx_grammar_user_status ON user_grammar_books(user_id, master_status);
 CREATE INDEX idx_grammar_relation ON user_grammar_books(grammar_relation);
+
+
+CREATE TABLE lyrics_suggestions (
+    id            SERIAL PRIMARY KEY,
+    song_id       VARCHAR(64) NOT NULL REFERENCES songs(song_id),
+    line_index    INTEGER NOT NULL,
+    time_ms       INTEGER,
+    field         VARCHAR(20) NOT NULL,
+    token_text    VARCHAR(100) DEFAULT '',
+    old_value     TEXT NOT NULL DEFAULT '',
+    new_value     TEXT NOT NULL,
+    reason        TEXT DEFAULT '',
+    status        VARCHAR(20) NOT NULL DEFAULT 'pending',
+    submitted_by  VARCHAR(64) NOT NULL,
+    reviewed_by   VARCHAR(64),
+    reviewed_at   TIMESTAMPTZ,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_suggestions_song_status ON lyrics_suggestions(song_id, status);
+CREATE INDEX idx_suggestions_submitted_by ON lyrics_suggestions(submitted_by);

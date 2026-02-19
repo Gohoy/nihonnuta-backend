@@ -7,6 +7,8 @@ const responseMiddleware = require('./middlewares/response');;
 
 
 var indexRouter = require('./routes/index');
+var authRouter = require('./routes/auth');
+var usersRouter = require('./routes/users');
 var songsRouter = require('./routes/songs');
 var learningRouter = require('./routes/learning');
 var wordbookRouter = require('./routes/wordbook');
@@ -23,6 +25,8 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
+app.use('/auth', authRouter);
+app.use('/user', usersRouter);
 app.use('/songs', songsRouter);
 app.use('/learning', learningRouter);
 app.use('/wordbook', wordbookRouter);

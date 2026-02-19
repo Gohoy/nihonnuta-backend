@@ -67,16 +67,75 @@ class LyricsProcessor {
       };
     }
 
-    const rawHtml = await this.kuroshiro.convert(surface, {
-      mode: "furigana",
-      to: "hiragana",
-    });
+    // Build furigana from the morphological analyzer's reading
+    // instead of kuroshiro (which may pick a different reading).
+    const result = this.buildFuriganaFromReading(surface, reading);
+    if (result) return result;
 
-    // 清理 rp 标签
-    const html = this.cleanFuriganaHtml(rawHtml);
-    const parts = this.parseRubyHtml(rawHtml);
-
+    // Fallback: wrap entire surface with the full reading
+    const html = `<ruby>${surface}<rt>${reading}</rt></ruby>`;
+    const parts = [{ text: surface, ruby: reading, type: "kanji" }];
     return { html, parts };
+  }
+
+  /**
+   * Split surface into kanji/kana segments and align with reading.
+   * E.g. surface="愛し" reading="あいし" → 愛(あい) + し
+   *      surface="思い出" reading="おもいで" → 思(おも) + い + 出(で)
+   */
+  buildFuriganaFromReading(surface, reading) {
+    // Split surface into segments of consecutive kanji vs kana
+    const segments = [];
+    let cur = "";
+    let curIsKanji = false;
+    for (const ch of surface) {
+      const isK = this.isKanji(ch);
+      if (cur && isK !== curIsKanji) {
+        segments.push({ text: cur, isKanji: curIsKanji });
+        cur = "";
+      }
+      cur += ch;
+      curIsKanji = isK;
+    }
+    if (cur) segments.push({ text: cur, isKanji: curIsKanji });
+
+    // Build a regex: kana segments become literal, kanji segments become (.+)
+    let pattern = "^";
+    for (const seg of segments) {
+      if (seg.isKanji) {
+        pattern += "(.+)";
+      } else {
+        // Escape regex special chars and use literal kana
+        const hira = this.kataToHira(seg.text);
+        pattern += hira.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      }
+    }
+    pattern += "$";
+
+    const match = reading.match(new RegExp(pattern));
+    if (!match) return null;
+
+    // Assign readings from regex groups
+    let groupIdx = 1;
+    const parts = [];
+    const htmlParts = [];
+    for (const seg of segments) {
+      if (seg.isKanji) {
+        const ruby = match[groupIdx++];
+        parts.push({ text: seg.text, ruby, type: "kanji" });
+        htmlParts.push(`<ruby>${seg.text}<rt>${ruby}</rt></ruby>`);
+      } else {
+        parts.push({ text: seg.text, ruby: null, type: "kana" });
+        htmlParts.push(seg.text);
+      }
+    }
+    return { html: htmlParts.join(""), parts };
+  }
+
+  isKanji(ch) {
+    const code = ch.codePointAt(0);
+    // CJK Unified Ideographs + Extension A
+    return (code >= 0x4e00 && code <= 0x9fff) || (code >= 0x3400 && code <= 0x4dbf);
   }
 
   async processLine(text) {
@@ -122,7 +181,7 @@ class LyricsProcessor {
     };
   }
 
-  async processSongLyricsData(lyricData = {}) {
+  async processSongLyricsData(lyricData = {}, kanaOverrides = {}) {
     // 首先是拿到它的歌词
     // 然后是处理歌词的分词
     // 然后是歌词分词的单词分级
@@ -168,7 +227,24 @@ class LyricsProcessor {
 
         const lineProcessRes = await this.processLine(lineObj.text);
         for (let token of lineProcessRes.tokens) {
-          token.tags = this.allWords[token.text]?.tags;
+          const entry = this.allWords[token.text] || this.allWords[token.base_form];
+          token.tags = entry?.tags;
+          token.meaning = entry?.meaning;
+        }
+        // Apply kana overrides for this timestamp
+        const lineOverrides = kanaOverrides[String(lineObj.time)];
+        if (lineOverrides) {
+          for (let token of lineProcessRes.tokens) {
+            if (lineOverrides[token.text]) {
+              token.kana = lineOverrides[token.text];
+              if (this.hasKanji(token.text)) {
+                token.furigana_html = `<ruby>${token.text}<rt>${token.kana}</rt></ruby>`;
+                token.furigana = [{ text: token.text, ruby: token.kana, type: "kanji" }];
+              }
+            }
+          }
+          lineProcessRes.furigana_html = lineProcessRes.tokens.map(t => t.furigana_html || t.text).join("");
+          lineProcessRes.kana = lineProcessRes.tokens.map(t => t.kana).join("");
         }
         timelineTextMap[lineObj.time] = {
           time: lineObj.time,
@@ -206,7 +282,9 @@ class LyricsProcessor {
         }
         const lineProcessRes = await this.processLine(lineObj.text);
         for (let token of lineProcessRes.tokens) {
-          token.tags = this.allWords[token.text]?.tags;
+          const entry = this.allWords[token.text] || this.allWords[token.base_form];
+          token.tags = entry?.tags;
+          token.meaning = entry?.meaning;
         }
         timelineTextMap[lineObj.time] = {
           time: lineObj.time,
@@ -237,7 +315,9 @@ class LyricsProcessor {
       if (!text) continue;
       const lineProcessRes = await this.processLine(text);
       for (let token of lineProcessRes.tokens) {
-        token.tags = this.allWords[token.text]?.tags;
+        const entry = this.allWords[token.text] || this.allWords[token.base_form];
+        token.tags = entry?.tags;
+        token.meaning = entry?.meaning;
       }
       processedLines.push({
         ...lineProcessRes,

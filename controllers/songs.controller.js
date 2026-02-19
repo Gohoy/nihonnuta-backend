@@ -1,6 +1,7 @@
 const songService = require("../services/songs.service");
 const neteaseService = require("../services/netease.service");
 const LyricsProcessor = require("../services/lyrics.service");
+const vocabularyService = require("../services/vocabulary.service");
 
 let lyricsProcessor;
 async function getLyricsProcessor() {
@@ -75,7 +76,49 @@ async function searchSongs(req, res) {
   return res.success(result);
 }
 async function uploadSong(req, res) {
-  return songService.uploadSong(req, res);
+  // uploadSong in service handles its own response, but we also persist the path
+  const file = req.file;
+  const songId = req.body.songId || Date.now().toString();
+  const filename = req.body.filename || (file ? file.originalname : null);
+
+  if (!file) {
+    return res.status(400).json({ error: "请选择文件" });
+  }
+
+  try {
+    const objectName = `${songId}/${filename}`;
+    const bucketName = "songs";
+    const cosService = require("../services/cos.service");
+    await cosService.uploadObject(bucketName, objectName, file);
+    const url = await cosService.getObjectUrl(bucketName, objectName);
+
+    // Skip persisting audio_url when uploading as a suggestion
+    const asSuggestion = req.body.asSuggestion === 'true';
+    if (!asSuggestion) {
+      await songService.updateSongAudioUrl(songId, objectName);
+    }
+
+    res.json({
+      success: true,
+      data: { songId, filename: file.originalname, path: objectName, url, size: file.size },
+    });
+  } catch (error) {
+    console.error("上传失败:", error);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+async function getSongAudio(req, res) {
+  try {
+    const songId = req.params.id;
+    const url = await songService.getFreshAudioUrl(songId);
+    if (!url) {
+      return res.status(404).json({ message: "Audio not found" });
+    }
+    return res.success({ url });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
 }
 
 async function searchNeteaseSongs(req, res) {
@@ -134,13 +177,20 @@ async function getProcessedSongLyrics(req, res) {
       return res.status(403).json({ message: "permission denied" });
     }
     const processor = await getLyricsProcessor();
+    const kanaOverrides = song.kana_overrides || {};
+    // Prefer the lyrics JSONB (has lrc/tlyric/romalrc) over plain lyrics_text
+    const lyricJsonb = song.lyrics;
+    if (lyricJsonb && lyricJsonb.lrc && lyricJsonb.lrc.lyric) {
+      const processed = await processor.processSongLyricsData(lyricJsonb, kanaOverrides);
+      return res.success(processed);
+    }
     const lyricsText = song.lyrics_text || "";
     if (lyricsText && lyricsText.trim()) {
       const processed = await processor.processLyricsText(lyricsText);
       return res.success(processed);
     }
     const lyricData = await neteaseService.getLyric(songId);
-    const processed = await processor.processSongLyricsData(lyricData);
+    const processed = await processor.processSongLyricsData(lyricData, kanaOverrides);
     return res.success(processed);
   } catch (error) {
     const statusCode = error.statusCode || 500;
@@ -164,6 +214,63 @@ async function getProcessedNeteaseLyric(req, res) {
   }
 }
 
+async function getSongVocabulary(req, res) {
+  try {
+    const songId = req.query.id;
+    const userId = req.query.user_id;
+    const level = req.query.level || "N5";
+    if (!songId) {
+      return res.status(400).json({ message: "id is required" });
+    }
+    const song = await songService.getSongById(songId);
+    if (!song) {
+      return res.status(404).json({ message: "song not found" });
+    }
+    // Process lyrics (same logic as getProcessedSongLyrics)
+    const processor = await getLyricsProcessor();
+    const kanaOverrides = song.kana_overrides || {};
+    let processed;
+    const lyricJsonb = song.lyrics;
+    if (lyricJsonb && lyricJsonb.lrc && lyricJsonb.lrc.lyric) {
+      processed = await processor.processSongLyricsData(lyricJsonb, kanaOverrides);
+    } else {
+      const lyricsText = song.lyrics_text || "";
+      if (lyricsText && lyricsText.trim()) {
+        processed = await processor.processLyricsText(lyricsText);
+      } else {
+        const lyricData = await neteaseService.getLyric(songId);
+        processed = await processor.processSongLyricsData(lyricData, kanaOverrides);
+      }
+    }
+    // Extract vocabulary
+    const tagNumbers = vocabularyService.levelToTagNumbers(level);
+    const allWords = processor.allWords || {};
+    const allVocab = vocabularyService.extractVocabulary(processed, tagNumbers, allWords);
+    // Filter out mastered words
+    const masteredWords = await vocabularyService.getMasteredWords(userId);
+    const vocabulary = allVocab.filter(
+      (v) => !masteredWords.has(v.word) && !masteredWords.has(v.base_form)
+    );
+    // Group by JLPT level
+    const grouped = {};
+    for (const v of vocabulary) {
+      const lvl = v.jlpt_level || "unknown";
+      if (!grouped[lvl]) grouped[lvl] = [];
+      grouped[lvl].push(v);
+    }
+    return res.success({
+      vocabulary,
+      grouped,
+      total: vocabulary.length,
+      level,
+      mastered_count: allVocab.length - vocabulary.length,
+    });
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+    return res.status(statusCode).json({ message: error.message });
+  }
+}
+
 module.exports = {
   getSong,
   playSong,
@@ -172,10 +279,12 @@ module.exports = {
   getPopularSongs,
   searchSongs,
   uploadSong,
+  getSongAudio,
   searchNeteaseSongs,
   getNeteaseLyric,
   getNeteaseSongDetail,
   getProcessedSongLyrics,
   getProcessedNeteaseLyric,
   importFromNetease,
+  getSongVocabulary,
 };

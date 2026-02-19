@@ -5,6 +5,8 @@ const controller = require("../controllers/wordbook.controller");
 router.post("/", controller.addWord);
 router.get("/", controller.getWordbook);
 router.get("/stats", controller.getWordbookStats);
+router.get("/review", controller.getReviewWords);
+router.post("/review", controller.submitReview);
 router.put("/status", controller.updateWordStatus);
 router.put("/note", controller.updateWordNote);
 router.delete("/:id", controller.removeWord);

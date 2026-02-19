@@ -8,9 +8,9 @@ async function addGrammarToBook(userId, songId, lineNum, grammarId, grammarData)
     INSERT INTO user_grammar_books (
       user_id, song_id, line_num, grammar_id,
       related_token_ids, grammar_type, grammar_relation,
-      structure_desc, grammar_desc, master_status
+      structure_desc, grammar_desc, example_sentence, master_status
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'unmastered')
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'unmastered')
     ON CONFLICT (user_id, song_id, line_num, grammar_id)
     DO UPDATE SET
       related_token_ids = EXCLUDED.related_token_ids,
@@ -18,6 +18,7 @@ async function addGrammarToBook(userId, songId, lineNum, grammarId, grammarData)
       grammar_relation = EXCLUDED.grammar_relation,
       structure_desc = EXCLUDED.structure_desc,
       grammar_desc = EXCLUDED.grammar_desc,
+      example_sentence = EXCLUDED.example_sentence,
       update_time = CURRENT_TIMESTAMP
     RETURNING *
   `;
@@ -31,6 +32,7 @@ async function addGrammarToBook(userId, songId, lineNum, grammarId, grammarData)
     grammarData.grammar_relation || '',
     grammarData.structure_desc || '',
     grammarData.grammar_desc || '',
+    grammarData.example_sentence || '',
   ]);
   return rows[0];
 }
@@ -144,6 +146,64 @@ async function getGrammarBookStats(userId) {
   return rows[0];
 }
 
+/**
+ * 获取待复习语法
+ */
+async function getDueGrammars(userId, limit = 20) {
+  const sql = `
+    SELECT gb.*, s.song_name, s.singer
+    FROM user_grammar_books gb
+    LEFT JOIN songs s ON gb.song_id = s.song_id
+    WHERE gb.user_id = $1
+      AND gb.next_review_date <= CURRENT_DATE
+    ORDER BY gb.next_review_date ASC, gb.ease_factor ASC
+    LIMIT $2
+  `;
+  const { rows } = await pool.query(sql, [userId, limit]);
+
+  rows.forEach(row => {
+    if (row.related_token_ids && typeof row.related_token_ids === 'string') {
+      try { row.related_token_ids = JSON.parse(row.related_token_ids); }
+      catch (e) { row.related_token_ids = []; }
+    }
+  });
+
+  const countSql = `
+    SELECT COUNT(*) FROM user_grammar_books
+    WHERE user_id = $1 AND next_review_date <= CURRENT_DATE
+  `;
+  const countResult = await pool.query(countSql, [userId]);
+
+  return {
+    grammars: rows,
+    total: parseInt(countResult.rows[0].count, 10),
+  };
+}
+
+/**
+ * 提交语法复习结果（SM-2）
+ */
+async function reviewGrammar(userId, grammarBookId, srsResult) {
+  const sql = `
+    UPDATE user_grammar_books
+    SET ease_factor = $1,
+        interval_days = $2,
+        next_review_date = $3,
+        review_count = review_count + 1,
+        last_review_time = CURRENT_TIMESTAMP
+    WHERE grammar_book_id = $4 AND user_id = $5
+    RETURNING *
+  `;
+  const { rows } = await pool.query(sql, [
+    srsResult.easeFactor,
+    srsResult.interval,
+    srsResult.nextReviewDate,
+    grammarBookId,
+    userId,
+  ]);
+  return rows[0];
+}
+
 module.exports = {
   addGrammarToBook,
   getUserGrammarBook,
@@ -151,5 +211,7 @@ module.exports = {
   removeGrammarFromBook,
   updateGrammarNote,
   getGrammarBookStats,
+  getDueGrammars,
+  reviewGrammar,
 };
 

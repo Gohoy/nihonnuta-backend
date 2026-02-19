@@ -6,15 +6,16 @@ const pool = require("../db/pool");
 async function addWordToBook(userId, songId, lineNum, tokenId, wordData) {
   const sql = `
     INSERT INTO user_wordbooks (
-      user_id, song_id, line_num, token_id, word, kana, pos, meaning, master_status
+      user_id, song_id, line_num, token_id, word, kana, pos, meaning, example_sentence, master_status
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'unmastered')
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'unmastered')
     ON CONFLICT (user_id, song_id, line_num, token_id)
     DO UPDATE SET
       word = EXCLUDED.word,
       kana = EXCLUDED.kana,
       pos = EXCLUDED.pos,
-      meaning = EXCLUDED.meaning
+      meaning = EXCLUDED.meaning,
+      example_sentence = EXCLUDED.example_sentence
     RETURNING *
   `;
   const { rows } = await pool.query(sql, [
@@ -26,6 +27,7 @@ async function addWordToBook(userId, songId, lineNum, tokenId, wordData) {
     wordData.kana || '',
     wordData.pos || '',
     wordData.meaning || '',
+    wordData.example_sentence || '',
   ]);
   return rows[0];
 }
@@ -128,6 +130,57 @@ async function getWordbookStats(userId) {
   return rows[0];
 }
 
+/**
+ * 获取待复习单词
+ */
+async function getDueWords(userId, limit = 20) {
+  const sql = `
+    SELECT wb.*, s.song_name, s.singer
+    FROM user_wordbooks wb
+    LEFT JOIN songs s ON wb.song_id = s.song_id
+    WHERE wb.user_id = $1
+      AND wb.next_review_date <= CURRENT_DATE
+    ORDER BY wb.next_review_date ASC, wb.ease_factor ASC
+    LIMIT $2
+  `;
+  const { rows } = await pool.query(sql, [userId, limit]);
+
+  const countSql = `
+    SELECT COUNT(*) FROM user_wordbooks
+    WHERE user_id = $1 AND next_review_date <= CURRENT_DATE
+  `;
+  const countResult = await pool.query(countSql, [userId]);
+
+  return {
+    words: rows,
+    total: parseInt(countResult.rows[0].count, 10),
+  };
+}
+
+/**
+ * 提交单词复习结果（SM-2）
+ */
+async function reviewWord(userId, wordBookId, srsResult) {
+  const sql = `
+    UPDATE user_wordbooks
+    SET ease_factor = $1,
+        interval_days = $2,
+        next_review_date = $3,
+        review_count = review_count + 1,
+        last_review_time = CURRENT_TIMESTAMP
+    WHERE word_book_id = $4 AND user_id = $5
+    RETURNING *
+  `;
+  const { rows } = await pool.query(sql, [
+    srsResult.easeFactor,
+    srsResult.interval,
+    srsResult.nextReviewDate,
+    wordBookId,
+    userId,
+  ]);
+  return rows[0];
+}
+
 module.exports = {
   addWordToBook,
   getUserWordbook,
@@ -135,5 +188,7 @@ module.exports = {
   removeWordFromBook,
   updateWordNote,
   getWordbookStats,
+  getDueWords,
+  reviewWord,
 };
 
