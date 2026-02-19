@@ -31,11 +31,23 @@ async function uploadObject(bucketName, objectName, file) {
 
 // 获取文件访问 URL（临时链接，有效期1天）
 async function getObjectUrl(bucketName, objectName) {
-  return await minioClient.presignedGetObject(
+  const presignedUrl = await minioClient.presignedGetObject(
     bucketName,
     objectName,
     24 * 60 * 60
   );
+  // Replace internal Docker hostname with public host for browser access
+  const publicHost = process.env.MINIO_PUBLIC_HOST;
+  const publicPort = process.env.MINIO_PUBLIC_PORT || "9000";
+  const publicSSL = String(process.env.MINIO_PUBLIC_USE_SSL || "false") === "true";
+  if (publicHost) {
+    const internalUrl = new URL(presignedUrl);
+    internalUrl.hostname = publicHost;
+    internalUrl.port = publicPort;
+    internalUrl.protocol = publicSSL ? "https:" : "http:";
+    return internalUrl.toString();
+  }
+  return presignedUrl;
 }
 
 // 获取永久访问 URL（需要设置 bucket 为公开）
