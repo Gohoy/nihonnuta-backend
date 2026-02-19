@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build:
@@ -31,7 +29,7 @@ services:
       context: ../nihonnuta-uniapp
       dockerfile: Dockerfile
       args:
-        VITE_SERVER_BASEURL: ${VITE_SERVER_BASEURL:-http://localhost:5217}
+        VITE_SERVER_BASEURL: ${VITE_SERVER_BASEURL:-/api}
     restart: unless-stopped
     ports:
       - "80:80"
@@ -71,7 +69,6 @@ services:
       - "9001:9001"
     volumes:
       - minio_data:/data
-      - ./minio/config:/root/.minio
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s
@@ -80,6 +77,4 @@ services:
 
 volumes:
   postgres_data:
-    driver: local
   minio_data:
-    driver: local
