@@ -420,13 +420,23 @@ async function getFreshAudioUrl(songId) {
 async function downloadAndCacheAudio(songId) {
   const neteaseService = require("./netease.service");
 
-  // 1. 获取下载 URL
+  // 1. 获取下载 URL（优先高品质下载，回退到流媒体URL）
   let downloadUrl = null;
   try {
     const data = await neteaseService.getSongDownloadUrl(songId);
     downloadUrl = data?.data?.url;
   } catch (e) {
     console.warn(`获取下载URL失败(songId=${songId}):`, e.message);
+  }
+
+  if (!downloadUrl) {
+    // 回退到 /song/url（流媒体质量，但对VIP歌曲也能获取）
+    try {
+      const data = await neteaseService.getSongUrl(songId);
+      downloadUrl = data?.data?.[0]?.url;
+    } catch (e) {
+      console.warn(`获取流媒体URL也失败(songId=${songId}):`, e.message);
+    }
   }
 
   if (!downloadUrl) {
