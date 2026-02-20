@@ -33,16 +33,18 @@ async function uploadObject(bucketName, objectName, file) {
 // bucket 需设置为 public download（mc anonymous set download）
 function getObjectUrl(bucketName, objectName) {
   const publicHost = process.env.MINIO_PUBLIC_HOST;
+  // Encode each path segment for safe URL usage
+  const encodedPath = objectName.split('/').map(s => encodeURIComponent(s)).join('/');
   if (publicHost) {
     const publicSSL = String(process.env.MINIO_PUBLIC_USE_SSL || "false") === "true";
     const protocol = publicSSL ? "https" : "http";
     // 通过 nginx /storage/ 代理访问 MinIO，不暴露 9000 端口
-    return `${protocol}://${publicHost}/storage/${bucketName}/${objectName}`;
+    return `${protocol}://${publicHost}/storage/${bucketName}/${encodedPath}`;
   }
   // 本地开发直接访问 MinIO
   const endpoint = process.env.MINIO_ENDPOINT || "localhost";
   const port = process.env.MINIO_PORT || "9000";
-  return `http://${endpoint}:${port}/${bucketName}/${objectName}`;
+  return `http://${endpoint}:${port}/${bucketName}/${encodedPath}`;
 }
 
 // 获取永久访问 URL（需要设置 bucket 为公开）

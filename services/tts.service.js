@@ -5,7 +5,7 @@ const BUCKET = "songs";
 const VOICE = "ja-JP-NanamiNeural";
 
 async function getOrGenerateTTS(word) {
-  const objectName = `tts/${encodeURIComponent(word)}.mp3`;
+  const objectName = `tts/${word}.mp3`;
 
   // 1. Check MinIO cache
   try {
