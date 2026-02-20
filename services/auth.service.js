@@ -100,7 +100,7 @@ async function wxLogin(code) {
 
 async function getUserInfo(userId) {
   const { rows } = await pool.query(
-    "SELECT user_id, username, nickname, avatar_url, level FROM users WHERE user_id = $1 AND is_deleted = FALSE",
+    "SELECT user_id, username, nickname, avatar_url, level, membership_type, membership_expire_time FROM users WHERE user_id = $1 AND is_deleted = FALSE",
     [userId]
   );
   if (rows.length === 0) {
@@ -108,12 +108,31 @@ async function getUserInfo(userId) {
   }
 
   const user = rows[0];
+
+  // Auto-downgrade expired membership
+  let membershipType = user.membership_type || "free";
+  if (
+    membershipType === "premium" &&
+    user.membership_expire_time &&
+    new Date(user.membership_expire_time) < new Date()
+  ) {
+    membershipType = "free";
+    pool
+      .query("UPDATE users SET membership_type = 'free' WHERE user_id = $1", [
+        userId,
+      ])
+      .catch(() => {});
+  }
+
   return {
     userId: user.user_id,
     username: user.username,
     nickname: user.nickname || user.username,
     avatar: user.avatar_url || "",
     level: user.level || "N5",
+    membershipType,
+    membershipExpireTime:
+      membershipType === "premium" ? user.membership_expire_time : null,
   };
 }
 

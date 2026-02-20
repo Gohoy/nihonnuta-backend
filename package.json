@@ -19,6 +19,7 @@
     "kuroshiro-analyzer-kuromoji": "^1.1.0",
     "minio": "^8.0.6",
     "morgan": "~1.9.1",
+    "msedge-tts": "^2.0.4",
     "multer": "^2.0.2",
     "pg": "^8.16.3"
   }

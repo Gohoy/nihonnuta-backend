@@ -12,6 +12,8 @@ var songsRouter = require('./routes/songs');
 var learningRouter = require('./routes/learning');
 var wordbookRouter = require('./routes/wordbook');
 var grammarbookRouter = require('./routes/grammarbook');
+var ttsRouter = require('./routes/tts');
+var redemptionRouter = require('./routes/redemption');
 
 var app = express();
 
@@ -29,6 +31,8 @@ app.use('/songs', songsRouter);
 app.use('/learning', learningRouter);
 app.use('/wordbook', wordbookRouter);
 app.use('/grammarbook', grammarbookRouter);
+app.use('/tts', ttsRouter);
+app.use('/redemption', redemptionRouter);
 
 // 数据库迁移路由（仅用于开发/修复）
 if (process.env.NODE_ENV !== 'production') {
