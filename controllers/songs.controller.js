@@ -287,7 +287,7 @@ async function downloadAudio(req, res) {
 async function batchDownloadAudio(req, res) {
   try {
     // 查找所有使用外部URL的歌曲
-    const pool = require("../db");
+    const pool = require("../db/pool");
     const { rows } = await pool.query(
       "SELECT song_id FROM songs WHERE audio_url LIKE 'http%' OR audio_url = '' OR audio_url IS NULL"
     );
