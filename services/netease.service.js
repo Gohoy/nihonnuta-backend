@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 
 const DEFAULT_BASE_URL = "http://localhost:3000";
-const COOKIE_FILE = path.join(__dirname, "../data/netease-cookie.json");
+const COOKIE_FILE = path.join(__dirname, "../persist/netease-cookie.json");
 
 function getBaseUrl() {
   return process.env.NETEASE_API_BASE || DEFAULT_BASE_URL;

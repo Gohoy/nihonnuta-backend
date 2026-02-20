@@ -16,7 +16,7 @@ services:
       - minio
       - netease-api
     volumes:
-      - ./backend-data:/app/data
+      - ./backend-data:/app/persist
 
   netease-api:
     build:
