@@ -14,6 +14,7 @@ var wordbookRouter = require('./routes/wordbook');
 var grammarbookRouter = require('./routes/grammarbook');
 var ttsRouter = require('./routes/tts');
 var redemptionRouter = require('./routes/redemption');
+var neteaseLoginRouter = require('./routes/netease-login');
 
 var app = express();
 
@@ -33,6 +34,7 @@ app.use('/wordbook', wordbookRouter);
 app.use('/grammarbook', grammarbookRouter);
 app.use('/tts', ttsRouter);
 app.use('/redemption', redemptionRouter);
+app.use('/netease', neteaseLoginRouter);
 
 // 数据库迁移路由（仅用于开发/修复）
 if (process.env.NODE_ENV !== 'production') {

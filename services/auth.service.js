@@ -124,6 +124,11 @@ async function getUserInfo(userId) {
       .catch(() => {});
   }
 
+  const adminIds = (process.env.ADMIN_USER_IDS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
   return {
     userId: user.user_id,
     username: user.username,
@@ -133,6 +138,7 @@ async function getUserInfo(userId) {
     membershipType,
     membershipExpireTime:
       membershipType === "premium" ? user.membership_expire_time : null,
+    isAdmin: adminIds.includes(user.user_id),
   };
 }
 
