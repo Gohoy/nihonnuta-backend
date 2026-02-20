@@ -271,6 +271,42 @@ async function getSongVocabulary(req, res) {
   }
 }
 
+async function downloadAudio(req, res) {
+  try {
+    const songId = req.params.id;
+    const result = await songService.downloadAndCacheAudio(songId);
+    if (!result) {
+      return res.status(404).json({ message: "无法下载该歌曲音频" });
+    }
+    return res.success(result);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+}
+
+async function batchDownloadAudio(req, res) {
+  try {
+    // 查找所有使用外部URL的歌曲
+    const pool = require("../db");
+    const { rows } = await pool.query(
+      "SELECT song_id FROM songs WHERE audio_url LIKE 'http%' OR audio_url = '' OR audio_url IS NULL"
+    );
+    const results = { success: [], failed: [] };
+    for (const row of rows) {
+      try {
+        const r = await songService.downloadAndCacheAudio(row.song_id);
+        if (r) results.success.push(row.song_id);
+        else results.failed.push({ id: row.song_id, reason: "无下载URL" });
+      } catch (e) {
+        results.failed.push({ id: row.song_id, reason: e.message });
+      }
+    }
+    return res.success(results);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+}
+
 module.exports = {
   getSong,
   playSong,
@@ -287,4 +323,6 @@ module.exports = {
   getProcessedNeteaseLyric,
   importFromNetease,
   getSongVocabulary,
+  downloadAudio,
+  batchDownloadAudio,
 };

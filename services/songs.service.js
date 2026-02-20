@@ -314,6 +314,8 @@ async function importSongFromNetease(neteaseSongId, options = {}) {
       songData.status,
       songData.create_user,
     ]);
+    // 异步下载音频到 MinIO（不阻塞响应）
+    downloadAndCacheAudio(neteaseSongId).catch(e => console.warn("自动下载音频失败:", e.message));
     return {
       song: rows[0],
       imported: true,
@@ -324,6 +326,8 @@ async function importSongFromNetease(neteaseSongId, options = {}) {
     try {
       await createSong(songData);
       const newSong = await getSongById(neteaseSongId);
+      // 异步下载音频到 MinIO（不阻塞响应）
+      downloadAndCacheAudio(neteaseSongId).catch(e => console.warn("自动下载音频失败:", e.message));
       return {
         song: newSong,
         imported: true,
@@ -408,6 +412,60 @@ async function getFreshAudioUrl(songId) {
   return url;
 }
 
+/**
+ * 从网易云下载音频并缓存到 MinIO
+ * @param {string} songId - 歌曲 ID（网易云 ID）
+ * @returns {{ objectName: string, size: number } | null}
+ */
+async function downloadAndCacheAudio(songId) {
+  const neteaseService = require("./netease.service");
+
+  // 1. 获取下载 URL
+  let downloadUrl = null;
+  try {
+    const data = await neteaseService.getSongDownloadUrl(songId);
+    downloadUrl = data?.data?.url;
+  } catch (e) {
+    console.warn(`获取下载URL失败(songId=${songId}):`, e.message);
+  }
+
+  if (!downloadUrl) {
+    console.warn(`歌曲 ${songId} 无可用下载URL`);
+    return null;
+  }
+
+  // 2. 下载音频文件
+  const res = await fetch(downloadUrl);
+  if (!res.ok) {
+    console.warn(`下载音频失败(songId=${songId}): HTTP ${res.status}`);
+    return null;
+  }
+
+  const arrayBuffer = await res.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  if (buffer.length < 1024) {
+    console.warn(`音频文件过小(songId=${songId}): ${buffer.length} bytes`);
+    return null;
+  }
+
+  // 3. 上传到 MinIO
+  const contentType = res.headers.get("content-type") || "audio/mpeg";
+  const ext = contentType.includes("flac") ? "flac" : "mp3";
+  const objectName = `${songId}/${songId}.${ext}`;
+
+  await cosService.uploadObject("songs", objectName, {
+    buffer,
+    size: buffer.length,
+    mimetype: contentType,
+  });
+
+  // 4. 更新数据库
+  await updateSongAudioUrl(songId, objectName);
+  console.log(`歌曲 ${songId} 音频已缓存: ${objectName} (${(buffer.length / 1024).toFixed(0)}KB)`);
+
+  return { objectName, size: buffer.length };
+}
+
 module.exports = {
   createSong,
   getSongById,
@@ -420,4 +478,5 @@ module.exports = {
   importSongFromNetease,
   updateSongAudioUrl,
   getFreshAudioUrl,
+  downloadAndCacheAudio,
 };

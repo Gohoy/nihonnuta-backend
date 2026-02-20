@@ -51,6 +51,10 @@ async function getSongUrl(songId) {
   return requestJson("/song/url", { id: songId });
 }
 
+async function getSongDownloadUrl(songId, br = 999000) {
+  return requestJson("/song/download/url", { id: songId, br });
+}
+
 // 导出 requestJson 供其他服务使用
 module.exports.requestJson = requestJson;
 
@@ -59,5 +63,6 @@ module.exports = {
   getLyric,
   getSongDetail,
   getSongUrl,
+  getSongDownloadUrl,
   requestJson,
 };

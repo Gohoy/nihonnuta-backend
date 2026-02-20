@@ -10,6 +10,8 @@ const upload = multer({ storage: multer.memoryStorage() });
 // 需要登录
 router.post("/upload", authMiddleware, upload.single("file"), controller.uploadSong);
 router.post("/import/netease", authMiddleware, controller.importFromNetease);
+router.post("/:id/download-audio", authMiddleware, controller.downloadAudio);
+router.post("/batch-download-audio", authMiddleware, controller.batchDownloadAudio);
 router.post("/", authMiddleware, controller.createSong);
 
 // 建议（需要登录）
