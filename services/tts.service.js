@@ -18,10 +18,10 @@ async function getOrGenerateTTS(word) {
   // 2. Generate via Edge TTS
   const tts = new MsEdgeTTS();
   await tts.setMetadata(VOICE, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
-  const readable = tts.toStream(word);
+  const { audioStream } = tts.toStream(word);
 
   const chunks = [];
-  for await (const chunk of readable) {
+  for await (const chunk of audioStream) {
     if (Buffer.isBuffer(chunk)) {
       chunks.push(chunk);
     }
