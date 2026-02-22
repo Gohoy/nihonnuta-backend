@@ -194,10 +194,14 @@ class LyricsProcessor {
     let lyricsJsonRes = {};
     let timelineTextMap = {};
 
+    // Metadata pattern: filter out composer/lyricist/arranger info lines
+    const metadataPattern = /^\s*(作词|作曲|编曲|制作人|Producer|Arranger|Lyricist|Composer)\s*[:：]/i;
+
     // 先处理翻译歌词
     for (let index in translateLyrics) {
       const lineObj = parseLrcLine(translateLyrics[index]);
       if (lineObj.timeStr) {
+        if (metadataPattern.test(lineObj.text)) continue;
         if (!timelineTextMap[lineObj.time]) {
           timelineTextMap[lineObj.time] = {};
         }
@@ -209,6 +213,7 @@ class LyricsProcessor {
     for (let index in romalrc) {
       const lineObj = parseLrcLine(romalrc[index]);
       if (lineObj.timeStr) {
+        if (metadataPattern.test(lineObj.text)) continue;
         if (!timelineTextMap[lineObj.time]) {
           timelineTextMap[lineObj.time] = {};
         }
@@ -217,7 +222,6 @@ class LyricsProcessor {
     }
 
     // 处理原歌词和分词
-    const metadataPattern = /^\s*(作词|作曲|编曲|制作人|Producer|Arranger|Lyricist|Composer)\s*[:：]/i;
     for (let index in originLyrics) {
       // 需要先去除前面的时间
       const lineObj = parseLrcLine(originLyrics[index]);
@@ -260,11 +264,22 @@ class LyricsProcessor {
         };
       }
     }
+    // Filter out orphan entries that have no original text (e.g. translation-only metadata remnants)
+    for (const time of Object.keys(timelineTextMap)) {
+      const entry = timelineTextMap[time];
+      if (!entry.original && !entry.tokens) {
+        delete timelineTextMap[time];
+      }
+    }
+    // Also filter out empty original lines (blank lines in LRC)
+    for (const time of Object.keys(timelineTextMap)) {
+      const entry = timelineTextMap[time];
+      if (entry.original !== undefined && !entry.original.trim()) {
+        delete timelineTextMap[time];
+      }
+    }
     lyricsJsonRes["meta"] = {
-      lineCount: translateLyrics.length,
-      // 从这行开始才是歌词，index（从0开始）
-      lyricStartIndex:
-        Object.keys(timelineTextMap).length - translateLyrics.length,
+      lineCount: Object.keys(timelineTextMap).length,
     };
     const sortedTimes = Object.keys(timelineTextMap)
       .map((time) => Number(time))
