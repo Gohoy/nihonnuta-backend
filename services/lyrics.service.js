@@ -217,10 +217,16 @@ class LyricsProcessor {
     }
 
     // 处理原歌词和分词
+    const metadataPattern = /^\s*(作词|作曲|编曲|制作人|Producer|Arranger|Lyricist|Composer)\s*[:：]/i;
     for (let index in originLyrics) {
       // 需要先去除前面的时间
       const lineObj = parseLrcLine(originLyrics[index]);
       if (lineObj.timeStr) {
+        // Skip metadata lines (作词/作曲/编曲 etc.)
+        if (metadataPattern.test(lineObj.text)) {
+          delete timelineTextMap[lineObj.time];
+          continue;
+        }
         if (!timelineTextMap[lineObj.time]) {
           timelineTextMap[lineObj.time] = {};
         }

@@ -2,10 +2,10 @@ const express = require("express");
 const router = express.Router();
 const authController = require("../controllers/auth.controller");
 const suggestionsController = require("../controllers/suggestions.controller");
-const authMiddleware = require("../middlewares/auth");
+const guard = require("../middlewares/guard");
 
-router.get("/info", authMiddleware, authController.getUserInfo);
-router.put("/level", authMiddleware, authController.updateLevel);
-router.get("/suggestions", authMiddleware, suggestionsController.getMySuggestions);
+router.get("/info", guard(), authController.getUserInfo);
+router.put("/level", guard(), authController.updateLevel);
+router.get("/suggestions", guard(), suggestionsController.getMySuggestions);
 
 module.exports = router;

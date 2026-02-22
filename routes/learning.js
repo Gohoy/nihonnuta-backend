@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const controller = require("../controllers/learning.controller");
-const authMiddleware = require("../middlewares/auth");
+const guard = require("../middlewares/guard");
 
-router.post("/record", authMiddleware, controller.recordLearning);
-router.get("/recent", authMiddleware, controller.getRecentLearned);
+router.post("/record", guard(), controller.recordLearning);
+router.get("/recent", guard(), controller.getRecentLearned);
 
 module.exports = router;

@@ -4,13 +4,13 @@ const { sm2 } = require("../services/srs.service");
 async function addWord(req, res) {
   try {
     const userId = req.user.userId;
-    const { song_id, line_num, token_id, word, kana, pos, meaning } = req.body;
+    const { song_id, line_num, token_id, word, kana, pos, meaning, example_sentence } = req.body;
 
     if (!song_id || line_num === undefined || token_id === undefined || !word) {
       return res.status(400).json({ message: "song_id, line_num, token_id, and word are required" });
     }
 
-    const wordData = { word, kana, pos, meaning };
+    const wordData = { word, kana, pos, meaning, example_sentence };
     const result = await wordbookService.addWordToBook(userId, song_id, line_num, token_id, wordData);
     return res.success(result);
   } catch (error) {

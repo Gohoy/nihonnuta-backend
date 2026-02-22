@@ -4,7 +4,6 @@ var logger = require('morgan');
 var cors = require('cors');
 const responseMiddleware = require('./middlewares/response');
 
-
 var indexRouter = require('./routes/index');
 var authRouter = require('./routes/auth');
 var usersRouter = require('./routes/users');
@@ -15,11 +14,12 @@ var grammarbookRouter = require('./routes/grammarbook');
 var ttsRouter = require('./routes/tts');
 var redemptionRouter = require('./routes/redemption');
 var neteaseLoginRouter = require('./routes/netease-login');
+var adminRouter = require('./routes/admin');
 
 var app = express();
 
 app.use(responseMiddleware);
-app.use(cors());    
+app.use(cors());
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -35,12 +35,7 @@ app.use('/grammarbook', grammarbookRouter);
 app.use('/tts', ttsRouter);
 app.use('/redemption', redemptionRouter);
 app.use('/netease', neteaseLoginRouter);
-
-// 数据库迁移路由（仅用于开发/修复）
-if (process.env.NODE_ENV !== 'production') {
-  const migrationRouter = require('./routes/migration');
-  app.use('/migration', migrationRouter);
-}
+app.use('/admin', adminRouter);
 
 // error handler
 app.use(function(err, req, res, next) {

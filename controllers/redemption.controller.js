@@ -45,4 +45,14 @@ async function listCodes(req, res) {
   }
 }
 
-module.exports = { redeemCode, generateCodes, listCodes };
+async function disableCode(req, res) {
+  const { id } = req.params;
+  try {
+    await redemptionService.disableCode(id);
+    return res.success({ message: "兑换码已禁用" });
+  } catch (e) {
+    return res.fail(e.status || 500, e.message || "禁用失败");
+  }
+}
+
+module.exports = { redeemCode, generateCodes, listCodes, disableCode };

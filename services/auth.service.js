@@ -100,7 +100,7 @@ async function wxLogin(code) {
 
 async function getUserInfo(userId) {
   const { rows } = await pool.query(
-    "SELECT user_id, username, nickname, avatar_url, level, membership_type, membership_expire_time FROM users WHERE user_id = $1 AND is_deleted = FALSE",
+    "SELECT user_id, username, nickname, avatar_url, level, role, membership_type, membership_expire_time FROM users WHERE user_id = $1 AND is_deleted = FALSE",
     [userId]
   );
   if (rows.length === 0) {
@@ -124,10 +124,7 @@ async function getUserInfo(userId) {
       .catch(() => {});
   }
 
-  const adminIds = (process.env.ADMIN_USER_IDS || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const userRole = user.role || "user";
 
   return {
     userId: user.user_id,
@@ -135,10 +132,11 @@ async function getUserInfo(userId) {
     nickname: user.nickname || user.username,
     avatar: user.avatar_url || "",
     level: user.level || "N5",
+    role: userRole,
     membershipType,
     membershipExpireTime:
       membershipType === "premium" ? user.membership_expire_time : null,
-    isAdmin: adminIds.includes(user.user_id),
+    isAdmin: userRole === "admin",
   };
 }
 

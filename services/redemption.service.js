@@ -102,4 +102,14 @@ async function listCodes(batchId, status, limit = 50, offset = 0) {
   return rows;
 }
 
-module.exports = { generateBatch, redeemCode, listCodes };
+async function disableCode(codeId) {
+  const { rowCount } = await pool.query(
+    "UPDATE redemption_codes SET status = 'disabled' WHERE code_id = $1 AND status = 'unused'",
+    [codeId]
+  );
+  if (rowCount === 0) {
+    throw { status: 400, message: "兑换码不存在或已被使用" };
+  }
+}
+
+module.exports = { generateBatch, redeemCode, listCodes, disableCode };

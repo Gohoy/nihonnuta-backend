@@ -115,6 +115,7 @@ async function getSongAudio(req, res) {
     if (!url) {
       return res.status(404).json({ message: "Audio not found" });
     }
+    res.set("Cache-Control", "no-store");
     return res.success({ url });
   } catch (error) {
     return res.status(500).json({ message: error.message });

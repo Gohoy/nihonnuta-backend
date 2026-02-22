@@ -1,8 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const controller = require("../controllers/tts.controller");
-const { optionalAuth } = require("../middlewares/auth");
+const guard = require("../middlewares/guard");
 
-router.get("/", optionalAuth, controller.getTTS);
+router.get("/", guard({ optional: true }), controller.getTTS);
 
 module.exports = router;

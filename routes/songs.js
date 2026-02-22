@@ -3,24 +3,24 @@ const multer = require("multer");
 const router = express.Router();
 const controller = require("../controllers/songs.controller");
 const suggestionsController = require("../controllers/suggestions.controller");
-const authMiddleware = require("../middlewares/auth");
-const { optionalAuth } = require("../middlewares/auth");
-const adminMiddleware = require("../middlewares/admin");
+const guard = require("../middlewares/guard");
 const upload = multer({ storage: multer.memoryStorage() });
 
-// 需要登录
-router.post("/upload", authMiddleware, upload.single("file"), controller.uploadSong);
-router.post("/import/netease", authMiddleware, controller.importFromNetease);
-router.post("/:id/download-audio", authMiddleware, adminMiddleware, controller.downloadAudio);
-router.post("/batch-download-audio", authMiddleware, adminMiddleware, controller.batchDownloadAudio);
-router.post("/", authMiddleware, controller.createSong);
+// Admin only
+router.post("/:id/download-audio", guard({ role: "admin" }), controller.downloadAudio);
+router.post("/batch-download-audio", guard({ role: "admin" }), controller.batchDownloadAudio);
 
-// 建议（需要登录）
-router.post("/suggestions/:suggestionId/review", authMiddleware, suggestionsController.reviewSuggestion);
-router.post("/:id/suggestions", authMiddleware, suggestionsController.submitSuggestion);
-router.get("/:id/suggestions", authMiddleware, suggestionsController.getSuggestions);
+// Auth required
+router.post("/upload", guard(), upload.single("file"), controller.uploadSong);
+router.post("/import/netease", guard(), controller.importFromNetease);
+router.post("/", guard(), controller.createSong);
 
-// 公开读取
+// Suggestions (auth required)
+router.post("/suggestions/:suggestionId/review", guard(), suggestionsController.reviewSuggestion);
+router.post("/:id/suggestions", guard(), suggestionsController.submitSuggestion);
+router.get("/:id/suggestions", guard(), suggestionsController.getSuggestions);
+
+// Public / optional auth
 router.get("/search", controller.searchSongs);
 router.get("/page", controller.getSongs);
 router.get("/popular", controller.getPopularSongs);
@@ -28,8 +28,8 @@ router.get("/netease/search", controller.searchNeteaseSongs);
 router.get("/netease/lyric", controller.getNeteaseLyric);
 router.get("/netease/processed", controller.getProcessedNeteaseLyric);
 router.get("/netease/song", controller.getNeteaseSongDetail);
-router.get("/processed", optionalAuth, controller.getProcessedSongLyrics);
-router.get("/vocabulary", optionalAuth, controller.getSongVocabulary);
+router.get("/processed", guard({ optional: true }), controller.getProcessedSongLyrics);
+router.get("/vocabulary", guard({ optional: true }), controller.getSongVocabulary);
 router.get("/:id/audio", controller.getSongAudio);
 router.get("/:id", controller.getSong);
 router.post("/:id/play", controller.playSong);
