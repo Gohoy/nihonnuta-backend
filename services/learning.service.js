@@ -12,12 +12,13 @@ async function upsertLearningRecord(userId, songId) {
 
 async function getRecentLearnedSongs(userId, limit = 10) {
   const { rows } = await pool.query(
-    `SELECT s.*
+    `SELECT s.*, MAX(r.create_time) as last_learn_time
      FROM user_learning_records r
      JOIN songs s ON r.song_id = s.song_id
      WHERE r.user_id = $1
        AND (s.is_public = TRUE OR s.create_user = $1)
-     ORDER BY r.create_time DESC
+     GROUP BY s.song_id
+     ORDER BY last_learn_time DESC
      LIMIT $2`,
     [userId, limit]
   );
